@@ -1,6 +1,5 @@
+use crate::AppResult;
 use async_trait::async_trait;
-
-use crate::error::AppError;
 
 #[derive(Debug, Clone)]
 pub struct ProgressInfo {
@@ -20,6 +19,6 @@ pub enum StreamEvent {
 
 #[async_trait]
 pub trait OutputStreamer: Send + Sync {
-    async fn handle_event(&mut self, event: StreamEvent) -> Result<(), AppError>;
-    async fn finish(&mut self) -> Result<(), AppError>;
+    async fn handle_event(&mut self, event: StreamEvent) -> AppResult<()>;
+    async fn finish(&mut self) -> AppResult<()>;
 }

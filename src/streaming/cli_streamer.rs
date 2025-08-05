@@ -1,9 +1,7 @@
-use std::io::{self, Write};
-
+use super::{OutputStreamer, StreamEvent};
+use crate::AppResult;
 use log::{debug, error, info};
-
-use super::streamer::{OutputStreamer, StreamEvent};
-use crate::error::AppError;
+use std::io::{self, Write};
 // use tokio::time::{Instant, Duration};
 
 pub struct CliStreamer {
@@ -19,25 +17,25 @@ impl CliStreamer {
         }
     }
 
-    pub fn write(&mut self, data: &str) -> Result<(), AppError> {
+    pub fn write(&mut self, data: &str) -> AppResult<()> {
         print!("{}", data);
         io::stdout().flush()?;
         Ok(())
     }
 
-    pub fn write_message(&mut self, message: &str) -> Result<(), AppError> {
+    pub fn write_message(&mut self, message: &str) -> AppResult<()> {
         println!("{}", message);
         io::stdout().flush()?;
         Ok(())
     }
 
-    pub fn flush(&mut self) -> Result<(), AppError> {
+    pub fn flush(&mut self) -> AppResult<()> {
         println!();
         io::stdout().flush()?;
         Ok(())
     }
 
-    pub fn clear_line(&mut self) -> Result<(), AppError> {
+    pub fn clear_line(&mut self) -> AppResult<()> {
         print!("\r\x1b[K");
         io::stdout().flush()?;
         Ok(())
@@ -46,11 +44,11 @@ impl CliStreamer {
 
 #[async_trait::async_trait]
 impl OutputStreamer for CliStreamer {
-    async fn finish(&mut self) -> Result<(), AppError> {
+    async fn finish(&mut self) -> AppResult<()> {
         self.handle_event(StreamEvent::Finished).await
     }
 
-    async fn handle_event(&mut self, event: StreamEvent) -> Result<(), AppError> {
+    async fn handle_event(&mut self, event: StreamEvent) -> AppResult<()> {
         debug!("{:?}", event);
         match event {
             StreamEvent::Token(token) => {

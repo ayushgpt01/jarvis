@@ -1,2 +1,4 @@
-pub mod agent;
-pub mod ollama;
+mod agent;
+mod ollama;
+
+pub use agent::process_prompt;

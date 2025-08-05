@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 
-use crate::error::AppError;
+use crate::{AppError, AppResult};
 
 #[derive(Debug, Parser)]
 #[command(name = "Jarvis")]
@@ -34,7 +34,7 @@ pub enum Commands {
 }
 
 impl Cli {
-    pub fn text(&self) -> Result<Option<String>, AppError> {
+    pub fn text(&self) -> AppResult<Option<String>> {
         // if prompt is empty, return error
         if self.prompt.is_empty() {
             if self.command.is_some() {

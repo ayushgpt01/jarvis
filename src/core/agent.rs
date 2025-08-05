@@ -1,10 +1,10 @@
 use crate::{
-    cli::Cli,
-    core::ollama::OllamaGenerate,
-    error::AppError,
-    streaming::streamer::{OutputStreamer, StreamEvent},
-    utils::functions::get_file_content,
+    AppError, AppResult, Cli,
+    streaming::{OutputStreamer, StreamEvent},
+    utils::get_file_content,
 };
+
+use super::ollama::OllamaGenerate;
 
 const SYSTEM_PROMPT: &str = r#"You are a helpful assistant. You are given a task and you need to answer the query based on the rules. (user query, context, rules, modules in xml format). Modules contain the functions that you can use to answer the query.
 
@@ -44,7 +44,7 @@ const HOST: &str = "http://localhost";
 const PORT: u16 = 11434;
 const LLM_MODEL: &str = "llama3.2";
 
-pub async fn process_prompt(cli: &Cli, streamer: &mut impl OutputStreamer) -> Result<(), AppError> {
+pub async fn process_prompt(cli: &Cli, streamer: &mut impl OutputStreamer) -> AppResult<()> {
     streamer
         .handle_event(StreamEvent::Status("Initializing...".to_string()))
         .await?;

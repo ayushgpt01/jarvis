@@ -1,2 +1,5 @@
-pub mod functions;
-pub mod logger;
+mod functions;
+mod logger;
+
+pub use functions::*;
+pub use logger::logger_init;

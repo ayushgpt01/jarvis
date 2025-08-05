@@ -1,14 +1,13 @@
+use crate::{
+    AppResult,
+    streaming::{OutputStreamer, ProgressInfo, StreamEvent},
+};
 use futures_util::{StreamExt, TryStreamExt};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio_stream::wrappers::LinesStream;
 use tokio_util::io::StreamReader;
-
-use crate::{
-    error::AppError,
-    streaming::streamer::{OutputStreamer, ProgressInfo, StreamEvent},
-};
 
 const GENERATE_API: &str = "/api/generate";
 // const COMPLETION_API: &str = "http://localhost:11434/v1/chat/completions";
@@ -40,37 +39,37 @@ pub struct OllamaGenerate {
 }
 
 #[derive(Debug, Serialize)]
-pub struct OllamaRequest {
-    pub model: String,
-    pub prompt: String,
-    pub stream: bool,
-    pub options: Option<ModelFileOptions>,
-    pub raw: bool,
-    pub template: Option<String>,
-    pub system: Option<String>,
+struct OllamaRequest {
+    model: String,
+    prompt: String,
+    stream: bool,
+    options: Option<ModelFileOptions>,
+    raw: bool,
+    template: Option<String>,
+    system: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct OllamaStreamResult {
-    // pub model: String,
-    // pub created_at: String,
-    pub response: String,
-    pub done: bool,
+struct OllamaStreamResult {
+    // model: String,
+    // created_at: String,
+    response: String,
+    done: bool,
 }
 
 // #[derive(Debug, Deserialize)]
-// pub struct OllamaResult {
-//     pub model: String,
-//     pub created_at: String,
-//     pub response: String,
-//     pub done: bool,
-//     pub context: Vec<String>, // Need to check this type
-//     pub total_duration: i64,
-//     pub load_duration: i64,
-//     pub prompt_eval_count: i32,
-//     pub prompt_eval_duration: i64,
-//     pub eval_count: i32,
-//     pub eval_duration: i64,
+// struct OllamaResult {
+//     model: String,
+//     created_at: String,
+//     response: String,
+//     done: bool,
+//     context: Vec<String>, // Need to check this type
+//     total_duration: i64,
+//     load_duration: i64,
+//     prompt_eval_count: i32,
+//     prompt_eval_duration: i64,
+//     eval_count: i32,
+//     eval_duration: i64,
 // }
 
 impl OllamaGenerate {
@@ -78,7 +77,7 @@ impl OllamaGenerate {
         &self,
         prompt: &str,
         streamer: &mut impl OutputStreamer,
-    ) -> Result<(), AppError> {
+    ) -> AppResult<()> {
         let client = Client::new();
 
         streamer
