@@ -1,4 +1,4 @@
-pub mod cli_streamer;
+mod cli_streamer;
 mod streamer;
 
 pub use cli_streamer::CliStreamer;

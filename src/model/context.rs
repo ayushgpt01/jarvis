@@ -8,11 +8,18 @@ pub struct Context {
     max_history: usize,
 }
 
+#[allow(dead_code)]
 impl Context {
     pub fn new(max_history: usize) -> Self {
         Self {
             messages: VecDeque::new(),
             max_history,
+        }
+    }
+
+    pub fn add_messages(&mut self, messages: Vec<Message>) {
+        for message in messages {
+            self.add_message(message.role, message.content);
         }
     }
 

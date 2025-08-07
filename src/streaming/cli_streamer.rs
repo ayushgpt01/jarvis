@@ -9,6 +9,7 @@ pub struct CliStreamer {
     //  last_progress_update: Instant,
 }
 
+#[allow(dead_code)]
 impl CliStreamer {
     pub fn new(new_show_progress: bool) -> Self {
         CliStreamer {

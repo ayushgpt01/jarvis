@@ -6,7 +6,7 @@ use tokio_stream::wrappers::LinesStream;
 use tokio_util::io::StreamReader;
 
 use super::config::OllamaConfig;
-use super::types::*;
+use super::ollama_api::*;
 
 use crate::{
     AppResult,

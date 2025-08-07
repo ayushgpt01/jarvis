@@ -1,4 +1,4 @@
-use super::types::OllamaModelOptions;
+use super::ollama_api::OllamaModelOptions;
 use crate::{AppError, AppResult, model::ModelConfig};
 
 #[derive(Debug, Clone)]
@@ -12,18 +12,7 @@ pub struct OllamaConfig {
 }
 
 impl OllamaConfig {
-    pub fn new(model: String) -> Self {
-        Self {
-            host: "http://localhost".to_string(),
-            port: 11434,
-            model,
-            options: OllamaModelOptions::default(),
-            raw: false,
-            template: None,
-        }
-    }
-
-    pub fn builder() -> OllamaConfigBuilder {
+    pub fn new() -> OllamaConfigBuilder {
         OllamaConfigBuilder::new()
     }
 

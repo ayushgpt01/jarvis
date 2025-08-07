@@ -1,7 +1,6 @@
-use super::{ModelConfig, ModelProvider, context::Context};
-use crate::{AppError, streaming::OutputStreamer};
+use super::{Context, ModelConfig, ModelProvider};
+use crate::{AppError, AppResult, streaming::OutputStreamer};
 
-/// AI Client struct that can be used by the user
 #[derive(Debug)]
 pub struct AIClient<P: ModelProvider> {
     provider: P,
@@ -9,27 +8,22 @@ pub struct AIClient<P: ModelProvider> {
     context: Context,
 }
 
+#[allow(dead_code)]
 impl<P: ModelProvider> AIClient<P> {
-    pub fn new(
-        provider: P,
-        config: P::Config,
-        max_context_history: usize,
-    ) -> Result<Self, AppError> {
-        config.validate()?;
-
-        Ok(Self {
-            provider,
-            config,
-            context: Context::new(max_context_history),
-        })
+    pub fn new() -> AIClientBuilder<P> {
+        AIClientBuilder {
+            provider: None,
+            config: None,
+            max_context_history: 100,
+            system_message: None,
+        }
     }
 
-    // Main interaction methods
     pub async fn chat_streaming(
         &mut self,
         prompt: &str,
         streamer: &mut dyn OutputStreamer,
-    ) -> Result<String, AppError> {
+    ) -> AppResult<String> {
         self.context.add_user_message(prompt.to_string());
 
         let messages = self.context.get_messages();
@@ -42,7 +36,7 @@ impl<P: ModelProvider> AIClient<P> {
         Ok(response)
     }
 
-    pub async fn chat(&mut self, prompt: &str) -> Result<String, AppError> {
+    pub async fn chat(&mut self, prompt: &str) -> AppResult<String> {
         self.context.add_user_message(prompt.to_string());
 
         let messages = self.context.get_messages();
@@ -52,7 +46,6 @@ impl<P: ModelProvider> AIClient<P> {
         Ok(response)
     }
 
-    // Context management
     pub fn set_system_message(&mut self, message: &str) {
         self.context.add_system_message(message.to_string());
     }
@@ -69,7 +62,6 @@ impl<P: ModelProvider> AIClient<P> {
         &self.context
     }
 
-    // Configuration access
     pub fn config(&self) -> &P::Config {
         &self.config
     }
@@ -83,7 +75,6 @@ impl<P: ModelProvider> AIClient<P> {
     }
 }
 
-/// Builder for AIClient struct that can be used by the user to create a new instance
 pub struct AIClientBuilder<P: ModelProvider> {
     provider: Option<P>,
     config: Option<P::Config>,
@@ -91,6 +82,7 @@ pub struct AIClientBuilder<P: ModelProvider> {
     system_message: Option<String>,
 }
 
+#[allow(dead_code)]
 impl<P: ModelProvider> AIClientBuilder<P> {
     pub fn new() -> Self {
         Self {
@@ -121,7 +113,7 @@ impl<P: ModelProvider> AIClientBuilder<P> {
         self
     }
 
-    pub fn build(self) -> Result<AIClient<P>, AppError> {
+    pub fn build(self) -> AppResult<AIClient<P>> {
         let provider = self
             .provider
             .ok_or_else(|| AppError::from("Provider is required"))?;
@@ -129,7 +121,13 @@ impl<P: ModelProvider> AIClientBuilder<P> {
             .config
             .ok_or_else(|| AppError::from("Config is required"))?;
 
-        let mut client = AIClient::new(provider, config, self.max_context_history)?;
+        config.validate()?;
+
+        let mut client = AIClient {
+            provider,
+            config,
+            context: Context::new(self.max_context_history),
+        };
 
         if let Some(system_msg) = self.system_message {
             client.set_system_message(&system_msg);

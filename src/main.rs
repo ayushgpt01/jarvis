@@ -27,8 +27,7 @@ async fn main() -> AppResult<()> {
             log::info!("Starting chat...");
         }
         None => {
-            let mut streamer = streaming::create_cli_streamer(false);
-            core::process_prompt(&cli, &mut streamer).await?;
+            core::process_prompt(&cli).await?;
         }
     }
 

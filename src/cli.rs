@@ -46,4 +46,8 @@ impl Cli {
             Ok(Some(self.prompt.join(" ")))
         }
     }
+
+    pub fn create_full_prompt(&self) {
+        
+    }
 }

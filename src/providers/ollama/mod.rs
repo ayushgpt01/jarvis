@@ -1,7 +1,18 @@
-use crate::providers::ollama::client::OllamaProvider;
+mod config;
+mod ollama_api;
+mod provider;
 
-pub mod client;
-pub mod config;
-pub mod types;
+pub use config::OllamaConfig;
+pub use provider::OllamaProvider;
 
-pub type OllamaClient = crate::model::client::AIClient<OllamaProvider>;
+use crate::AppResult;
+pub type OllamaClient = crate::model::AIClient<provider::OllamaProvider>;
+
+pub fn create_ollama_client(config: OllamaConfig) -> AppResult<OllamaClient> {
+    let client = OllamaClient::new()
+        .config(config)
+        .provider(OllamaProvider::new())
+        .build()?;
+
+    Ok(client)
+}
