@@ -3,6 +3,7 @@ mod ollama_api;
 mod provider;
 
 pub use config::OllamaConfig;
+pub use ollama_api::OllamaModelOptions;
 pub use provider::OllamaProvider;
 
 use crate::AppResult;

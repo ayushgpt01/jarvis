@@ -1,3 +1,4 @@
+use crate::modules::ModuleError;
 use log::error;
 use thiserror::Error;
 
@@ -20,10 +21,19 @@ pub enum AppError {
 
     #[error("Unknown error: {0}")]
     Other(String),
+
+    #[error("Unknown function: {0}")]
+    ModuleError(String),
 }
 
 impl AppError {
     pub fn from(s: &str) -> Self {
         Self::Other(s.to_string())
+    }
+}
+
+impl From<ModuleError> for AppError {
+    fn from(e: ModuleError) -> Self {
+        AppError::ModuleError(e.to_string())
     }
 }

@@ -1,4 +1,7 @@
-use crate::model::{Message, MessageRole};
+use crate::{
+    model::{Message, MessageRole},
+    modules::{Tool, ToolCall},
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,12 +60,14 @@ pub struct OllamaCompletionRequest {
     pub messages: Vec<OllamaMessage>,
     pub stream: bool,
     pub options: Option<OllamaModelOptions>,
+    pub tools: Option<Vec<Tool>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OllamaMessage {
     pub role: String,
     pub content: String,
+    pub tool_calls: Option<Vec<ToolCall>>,
 }
 
 impl From<&Message> for OllamaMessage {
@@ -76,6 +81,7 @@ impl From<&Message> for OllamaMessage {
         Self {
             role: role.to_string(),
             content: msg.content.clone(),
+            tool_calls: None,
         }
     }
 }
@@ -93,11 +99,15 @@ pub struct OllamaCompletionChoice {
 #[derive(Debug, Deserialize)]
 pub struct OllamaCompletionMessage {
     pub content: String,
+    pub role: String,
+    pub tool_calls: Option<Vec<ToolCall>>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct OllamaCompletionDelta {
     pub content: Option<String>,
+    pub role: Option<String>,
+    pub tool_calls: Option<Vec<ToolCall>>,
 }
 
 #[derive(Debug, Deserialize)]

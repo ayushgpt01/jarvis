@@ -1,5 +1,5 @@
 use super::ollama_api::OllamaModelOptions;
-use crate::{AppError, AppResult, model::ModelConfig};
+use crate::{AppError, AppResult, model::ModelConfig, modules::Tool};
 
 #[derive(Debug, Clone)]
 pub struct OllamaConfig {
@@ -8,6 +8,7 @@ pub struct OllamaConfig {
     pub model: String,
     pub options: OllamaModelOptions,
     pub raw: bool,
+    pub tools: Option<Vec<Tool>>,
     pub template: Option<String>,
 }
 
@@ -44,6 +45,7 @@ pub struct OllamaConfigBuilder {
     port: u16,
     model: Option<String>,
     options: OllamaModelOptions,
+    tools: Option<Vec<Tool>>,
     raw: bool,
     template: Option<String>,
 }
@@ -54,10 +56,16 @@ impl OllamaConfigBuilder {
             host: "http://localhost".to_string(),
             port: 11434,
             model: None,
+            tools: None,
             options: OllamaModelOptions::default(),
             raw: false,
             template: None,
         }
+    }
+
+    pub fn tools(mut self, tools: Vec<Tool>) -> Self {
+        self.tools = Some(tools);
+        self
     }
 
     pub fn host(mut self, host: String) -> Self {
@@ -98,6 +106,7 @@ impl OllamaConfigBuilder {
         Ok(OllamaConfig {
             host: self.host,
             port: self.port,
+            tools: self.tools,
             model,
             options: self.options,
             raw: self.raw,

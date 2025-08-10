@@ -151,6 +151,7 @@ impl OllamaProvider {
             messages: ollama_messages,
             stream: true,
             options: Some(config.options.clone()),
+            tools: config.tools.clone(),
         };
 
         let response = self

@@ -20,6 +20,9 @@ async fn main() -> AppResult<()> {
     let _ = utils::logger_init();
     log::info!("Starting Program...");
 
+    let registry = modules::ModuleRegistry::new();
+    let modules = registry.list_modules();
+
     let cli = Cli::parse();
 
     match cli.command {
@@ -27,7 +30,7 @@ async fn main() -> AppResult<()> {
             log::info!("Starting chat...");
         }
         None => {
-            core::process_prompt(&cli).await?;
+            core::process_prompt(&cli, &registry).await?;
         }
     }
 
