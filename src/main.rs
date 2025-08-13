@@ -1,5 +1,6 @@
 use clap::Parser;
 use dotenv::dotenv;
+use std::sync::Arc;
 
 mod cli;
 mod core;
@@ -20,7 +21,7 @@ async fn main() -> AppResult<()> {
     let _ = utils::logger_init();
     log::info!("Starting Program...");
 
-    let registry = modules::ModuleRegistry::new();
+    let registry = Arc::new(modules::ModuleRegistry::new());
     let modules = registry.list_modules();
 
     let cli = Cli::parse();

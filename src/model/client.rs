@@ -1,11 +1,17 @@
 use super::{Context, ModelConfig, ModelProvider};
-use crate::{AppError, AppResult, streaming::OutputStreamer};
+use crate::{
+    AppError, AppResult,
+    modules::ModuleRegistry,
+    streaming::{NullStreamer, OutputStreamer, StreamEvent},
+};
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct AIClient<P: ModelProvider> {
     provider: P,
     config: P::Config,
     context: Context,
+    registry: Arc<ModuleRegistry>,
 }
 
 #[allow(dead_code)]
@@ -14,9 +20,71 @@ impl<P: ModelProvider> AIClient<P> {
         AIClientBuilder {
             provider: None,
             config: None,
+            modules: None,
             max_context_history: 100,
             system_message: None,
         }
+    }
+
+    pub async fn chat_streaming_with_tools(
+        &mut self,
+        prompt: &str,
+        streamer: &mut dyn OutputStreamer,
+    ) -> AppResult<String> {
+        self.context.add_user_message(prompt.to_string());
+
+        let max_iterations = 10;
+        let mut iteration = 0;
+        let mut final_response = String::new();
+
+        loop {
+            iteration += 1;
+            if iteration > max_iterations {
+                streamer
+                    .handle_event(StreamEvent::Error(
+                        "Maximum tool chain iterations reached".to_string(),
+                    ))
+                    .await?;
+
+                break;
+            }
+
+            let messages = self.context.get_messages();
+            let result = self
+                .provider
+                .generate(&messages, &self.config, &mut NullStreamer::new())
+                .await?;
+
+            log::debug!("Context : {:#?}", self.context);
+            log::debug!("GenerateResult : {:#?}", result);
+
+            final_response.push_str(&result.response);
+
+            if !result.response.is_empty() {
+                self.context.add_assistant_message(result.response.clone());
+            }
+
+            if let Some(tool_calls) = &result.tool_calls {
+                for tool_call in tool_calls {
+                    let tool_result = self.registry.execute(&tool_call.function)?;
+                    let tool_message = format!(
+                        "Tool '{}' executed with arguments {:?} returned: {:?}",
+                        tool_call.function.name, tool_call.function.arguments, tool_result
+                    );
+                    self.context.add_assistant_message(tool_message);
+                }
+            } else {
+                for c in result.response.chars() {
+                    streamer
+                        .handle_event(StreamEvent::Token(c.to_string()))
+                        .await?;
+                }
+
+                break;
+            }
+        }
+
+        Ok(final_response)
     }
 
     pub async fn chat_streaming(
@@ -24,26 +92,37 @@ impl<P: ModelProvider> AIClient<P> {
         prompt: &str,
         streamer: &mut dyn OutputStreamer,
     ) -> AppResult<String> {
+        if self.provider.supports_tools() {
+            return self.chat_streaming_with_tools(prompt, streamer).await;
+        }
+
         self.context.add_user_message(prompt.to_string());
 
         let messages = self.context.get_messages();
-        let response = self
+        let result = self
             .provider
             .generate_streaming(&messages, &self.config, streamer)
             .await?;
 
-        self.context.add_assistant_message(response.clone());
-        Ok(response)
+        self.context.add_assistant_message(result.response.clone());
+        Ok(result.response)
     }
 
-    pub async fn chat(&mut self, prompt: &str) -> AppResult<String> {
+    pub async fn chat(
+        &mut self,
+        prompt: &str,
+        streamer: &mut dyn OutputStreamer,
+    ) -> AppResult<String> {
         self.context.add_user_message(prompt.to_string());
 
         let messages = self.context.get_messages();
-        let response = self.provider.generate(&messages, &self.config).await?;
+        let result = self
+            .provider
+            .generate(&messages, &self.config, streamer)
+            .await?;
 
-        self.context.add_assistant_message(response.clone());
-        Ok(response)
+        self.context.add_assistant_message(result.response.clone());
+        Ok(result.response)
     }
 
     pub fn set_system_message(&mut self, message: &str) {
@@ -70,6 +149,10 @@ impl<P: ModelProvider> AIClient<P> {
         &mut self.config
     }
 
+    pub fn registry(&self) -> &Arc<ModuleRegistry> {
+        &self.registry
+    }
+
     pub fn provider(&self) -> &P {
         &self.provider
     }
@@ -79,6 +162,7 @@ pub struct AIClientBuilder<P: ModelProvider> {
     provider: Option<P>,
     config: Option<P::Config>,
     max_context_history: usize,
+    modules: Option<Arc<ModuleRegistry>>,
     system_message: Option<String>,
 }
 
@@ -88,6 +172,7 @@ impl<P: ModelProvider> AIClientBuilder<P> {
         Self {
             provider: None,
             config: None,
+            modules: None,
             max_context_history: 100,
             system_message: None,
         }
@@ -113,6 +198,11 @@ impl<P: ModelProvider> AIClientBuilder<P> {
         self
     }
 
+    pub fn modules(mut self, modules: Arc<ModuleRegistry>) -> Self {
+        self.modules = Some(modules);
+        self
+    }
+
     pub fn build(self) -> AppResult<AIClient<P>> {
         let provider = self
             .provider
@@ -120,6 +210,9 @@ impl<P: ModelProvider> AIClientBuilder<P> {
         let config = self
             .config
             .ok_or_else(|| AppError::from("Config is required"))?;
+        let modules = self
+            .modules
+            .unwrap_or(Arc::new(ModuleRegistry::empty_registry()));
 
         config.validate()?;
 
@@ -127,6 +220,7 @@ impl<P: ModelProvider> AIClientBuilder<P> {
             provider,
             config,
             context: Context::new(self.max_context_history),
+            registry: modules,
         };
 
         if let Some(system_msg) = self.system_message {

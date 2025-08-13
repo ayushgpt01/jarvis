@@ -12,6 +12,8 @@ pub struct Tool {
 pub struct ToolFunction {
     pub name: String,
     pub description: String,
+    /// Name of this module
+    pub module: String,
     /// Parameters for the tool
     /// serde_json::json!({
     ///     "type": "object",
@@ -42,6 +44,8 @@ pub struct ToolCall {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ToolCallFunction {
     pub name: String,
+    /// Name of the module. This is returned by LLM
+    pub module: String,
     pub arguments: serde_json::Value,
 }
 
@@ -61,7 +65,7 @@ pub enum ModuleError {
 
 pub type ModuleResult<T, E = ModuleError> = std::result::Result<T, E>;
 
-pub trait Module {
+pub trait Module: Send + Sync {
     /// Name of the current module. This must be unique
     fn name(&self) -> &'static str;
     /// Description is what user will see in the help of cli

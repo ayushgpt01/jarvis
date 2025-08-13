@@ -1,18 +1,19 @@
+use super::config::OllamaConfig;
+use super::ollama_api::*;
+use crate::{
+    AppResult,
+    model::{GenerateResult, Message, ModelProvider},
+    modules::ToolCall,
+    streaming::{OutputStreamer, ProgressInfo, StreamEvent},
+};
 use async_trait::async_trait;
 use futures_util::{StreamExt, TryStreamExt};
+use regex::Regex;
 use reqwest::Client;
+use serde::de::Error;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio_stream::wrappers::LinesStream;
 use tokio_util::io::StreamReader;
-
-use super::config::OllamaConfig;
-use super::ollama_api::*;
-
-use crate::{
-    AppResult,
-    model::{Message, ModelProvider},
-    streaming::{OutputStreamer, ProgressInfo, StreamEvent},
-};
 
 const GENERATE_API: &str = "/api/generate";
 const COMPLETION_API: &str = "/v1/chat/completions";
@@ -52,12 +53,30 @@ impl OllamaProvider {
         (system_message, prompt)
     }
 
+    // Helper method to try parsing tool calls from content
+    fn try_parse_tool_calls(&self, content: &str) -> Result<Vec<ToolCall>, serde_json::Error> {
+        let trimmed = content.trim();
+
+        // Try to parse as array of tool calls
+        if trimmed.starts_with('[') {
+            return serde_json::from_str::<Vec<ToolCall>>(trimmed);
+        }
+
+        // Try to parse as single tool call
+        if trimmed.starts_with('{') {
+            let single_call: ToolCall = serde_json::from_str(trimmed)?;
+            return Ok(vec![single_call]);
+        }
+
+        Err(serde_json::Error::custom("invalid tool format"))
+    }
+
     async fn generate_via_generate_api(
         &self,
         messages: &[Message],
         config: &OllamaConfig,
         streamer: &mut dyn OutputStreamer,
-    ) -> AppResult<String> {
+    ) -> AppResult<GenerateResult> {
         let (system_message, prompt) = self.messages_to_prompt(messages);
 
         streamer
@@ -71,7 +90,7 @@ impl OllamaProvider {
         let request = OllamaGenerateRequest {
             model: config.model.clone(),
             prompt,
-            stream: true,
+            stream: false,
             options: Some(config.options.clone()),
             raw: config.raw,
             template: config.template.clone(),
@@ -127,7 +146,43 @@ impl OllamaProvider {
             }
         }
 
-        Ok(full_response)
+        let mut all_tool_calls: Vec<ToolCall> = Vec::new();
+        let mut final_response = full_response.clone();
+
+        // First, try to parse the entire response as JSON tool calls
+        if let Ok(calls) = self.try_parse_tool_calls(&full_response) {
+            all_tool_calls.extend(calls);
+            // If the entire response was tool calls, clear the final response
+            final_response = String::new();
+        } else {
+            // Try to extract from code blocks
+            let code_block_regex = Regex::new(r"``````").unwrap();
+
+            for captures in code_block_regex.captures_iter(&full_response) {
+                let tool_call_content = captures[1].trim();
+
+                if let Ok(calls) = self.try_parse_tool_calls(tool_call_content) {
+                    all_tool_calls.extend(calls);
+                }
+            }
+
+            // Remove code blocks from final response if we found tool calls
+            if !all_tool_calls.is_empty() {
+                final_response = code_block_regex
+                    .replace_all(&full_response, "")
+                    .trim()
+                    .to_string();
+            }
+        }
+
+        Ok(GenerateResult {
+            response: final_response,
+            tool_calls: if all_tool_calls.is_empty() {
+                None
+            } else {
+                Some(all_tool_calls)
+            },
+        })
     }
 
     async fn generate_via_completion_api(
@@ -135,7 +190,7 @@ impl OllamaProvider {
         messages: &[Message],
         config: &OllamaConfig,
         streamer: &mut dyn OutputStreamer,
-    ) -> AppResult<String> {
+    ) -> AppResult<GenerateResult> {
         streamer
             .handle_event(StreamEvent::Progress(ProgressInfo {
                 current: 20,
@@ -163,6 +218,7 @@ impl OllamaProvider {
             .error_for_status()?;
 
         let mut full_response = String::new();
+        let mut all_tool_calls = Vec::new();
         let byte_stream = response.bytes_stream();
         let stream_reader = StreamReader::new(
             byte_stream.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
@@ -189,6 +245,10 @@ impl OllamaProvider {
                                                 .handle_event(StreamEvent::Token(content.clone()))
                                                 .await?;
                                         }
+
+                                        if let Some(tool_calls) = &delta.tool_calls {
+                                            all_tool_calls.extend(tool_calls.clone());
+                                        }
                                     }
                                 }
                             }
@@ -211,7 +271,14 @@ impl OllamaProvider {
             }
         }
 
-        Ok(full_response)
+        Ok(GenerateResult {
+            response: full_response,
+            tool_calls: if all_tool_calls.is_empty() {
+                None
+            } else {
+                Some(all_tool_calls)
+            },
+        })
     }
 }
 
@@ -230,7 +297,7 @@ impl ModelProvider for OllamaProvider {
         messages: &[Message],
         config: &Self::Config,
         streamer: &mut dyn OutputStreamer,
-    ) -> AppResult<String> {
+    ) -> AppResult<GenerateResult> {
         // Try completion API first, fallback to generate API
         match self
             .generate_via_completion_api(messages, config, streamer)
@@ -243,6 +310,16 @@ impl ModelProvider for OllamaProvider {
                     .await
             }
         }
+    }
+
+    async fn generate(
+        &self,
+        messages: &[Message],
+        config: &Self::Config,
+        streamer: &mut dyn OutputStreamer,
+    ) -> AppResult<GenerateResult> {
+        self.generate_via_generate_api(messages, config, streamer)
+            .await
     }
 
     fn provider_name(&self) -> &'static str {

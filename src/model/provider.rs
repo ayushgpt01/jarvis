@@ -1,5 +1,11 @@
 use super::Message;
-use crate::{AppResult, streaming::OutputStreamer};
+use crate::{AppResult, modules::ToolCall, streaming::OutputStreamer};
+
+#[derive(Debug, Clone)]
+pub struct GenerateResult {
+    pub response: String,
+    pub tool_calls: Option<Vec<ToolCall>>,
+}
 
 pub trait ModelConfig: Send + Sync + Clone {
     #[allow(dead_code)]
@@ -19,18 +25,15 @@ pub trait ModelProvider: Send + Sync {
         messages: &[Message],
         config: &Self::Config,
         streamer: &mut dyn OutputStreamer,
-    ) -> AppResult<String>;
+    ) -> AppResult<GenerateResult>;
 
     #[allow(dead_code)]
-    async fn generate(&self, messages: &[Message], config: &Self::Config) -> AppResult<String> {
-        use crate::streaming::create_cli_streamer;
-
-        let mut cli_streamer = create_cli_streamer(false);
-        self.generate_streaming(messages, config, &mut cli_streamer)
-            .await?;
-
-        Ok("".to_string())
-    }
+    async fn generate(
+        &self,
+        messages: &[Message],
+        config: &Self::Config,
+        streamer: &mut dyn OutputStreamer,
+    ) -> AppResult<GenerateResult>;
 
     #[allow(dead_code)]
     fn provider_name(&self) -> &'static str;
@@ -42,6 +45,10 @@ pub trait ModelProvider: Send + Sync {
 
     #[allow(dead_code)]
     fn supports_system_messages(&self) -> bool {
+        true
+    }
+
+    fn supports_tools(&self) -> bool {
         true
     }
 

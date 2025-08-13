@@ -18,3 +18,4 @@ futures-util = "0.3.31"
 tokio-stream = {version = "0.1.17", features = ["io-util"]}
 async-trait = "0.1.88"
 evalexpr = {version = "12.0.2", features = ["serde"]}
+regex = "1.11.1"

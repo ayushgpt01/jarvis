@@ -62,6 +62,7 @@ impl Module for Arithmetic {
             tool_type: "function".to_string(),
             function: super::ToolFunction {
                 name: "eval".to_string(),
+                module: Self::name().to_string(),
                 description: "Evaluate an expression".to_string(),
                 parameters: serde_json::json!({
                   "type": "object",
