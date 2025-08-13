@@ -18,7 +18,7 @@ pub type AppResult<T, E = crate::error::AppError> = std::result::Result<T, E>;
 #[tokio::main]
 async fn main() -> AppResult<()> {
     dotenv().ok();
-    let _ = utils::logger_init();
+    let logger_handle = utils::logger_init()?;
     log::info!("Starting Program...");
 
     let registry = Arc::new(modules::ModuleRegistry::new());
@@ -34,6 +34,8 @@ async fn main() -> AppResult<()> {
             core::process_prompt(&cli, &registry).await?;
         }
     }
+
+    logger_handle.flush();
 
     Ok(())
 }

@@ -50,6 +50,7 @@ pub struct OllamaConfigBuilder {
     template: Option<String>,
 }
 
+#[allow(dead_code)]
 impl OllamaConfigBuilder {
     pub fn new() -> Self {
         Self {

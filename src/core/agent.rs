@@ -24,18 +24,19 @@ __MODULES__
 - Answer directly and without using XML tags.
 - When proposing files, use the file block syntax (see examples below).
 - For Markdown files, use four backticks to wrap the file content so inner code blocks are preserved.
+- When a tool is called, you MUST ONLY return the JSON array. Do not include any other text, reasoning, or explanations outside the JSON array.
+- If no tool is required, respond normally as plain text (not JSON).
+- When a tool returns a result, you will see it in the conversation history as 'TOOL_RESULT: ...'. Your final answer MUST be a direct, concise summary of the result in natural language. Do not add any conversational text, explanations, or extraneous details unless asked.
+- When a numerical result is obtained, present it as a plain number without any additional text, symbols, or currency signs.
+- You must only use the function names provided in the module registry. Do not invent new functions.
 
---- TOOL / MODULE USAGE (IMPORTANT) ---
-You may call one or more tools (functions) that belong to modules. Each tool in the provided tool registry contains:
-- type: "function"
-- function: { name, module, parameters }
+--- TOOL / MODULE USAGE ---
+You have access to a set of tools (functions) within modules. Each tool has a `name`, `module`, and `parameters`. To use a tool, you must return a **single JSON array** of one or more tool call objects.
 
-When you decide to call tools you MUST follow these rules exactly:
+**IMPORTANT RULES for Tool Calls:**
+1. You **MUST** return only a JSON array. No text, explanations, or other characters should appear outside of the JSON.
+2. Each object in the array **MUST** strictly follow this structure:
 
-1. **Only** return a single JSON _array_ containing the tool call objects. Do not include any additional text outside the JSON array. The client expects pure JSON when you invoke tools.
-2. Each tool call object must match this format exactly:
-
-```json
 [
   {
     "type": "function",
@@ -46,29 +47,25 @@ When you decide to call tools you MUST follow these rules exactly:
     }
   }
 ]
-````
 
 3. The `module` field is required and must match the module name shown in the `<modules>` section exactly.
 4. Argument objects must strictly conform to the parameter schema provided with the tool (no missing required fields and no extra unexpected fields).
 5. You may return multiple tool call objects in the array (for multi-step operations).
-6. If no tool is required, respond normally as plain text (not JSON).
 
 Examples:
 
-* If the user asks: "Compute 2+2", and the `arithmetic.eval` tool is appropriate, return:
+* If the user asks: "What is 10 divided by 3?", and the `math.eval` tool is appropriate, return:
 
-```json
 [
   {
     "type": "function",
     "function": {
       "name": "eval",
-      "module": "arithmetic",
-      "arguments": { "expression": "2+2" }
+      "module": "math",
+      "arguments": { "expression": "10.0/3" }
     }
   }
 ]
-```
 
 * If no tool is needed, reply with plain language and not JSON.
 
@@ -106,7 +103,7 @@ pub async fn process_prompt(cli: &Cli, module_registry: &Arc<ModuleRegistry>) ->
         let tool_schemas = module.tools();
 
         // Human-readable for system prompt
-        let module_desc = format!("- {}: {}\n", module.name(), module.description());
+        let module_desc = format!("{}\n", module.get_prompt());
 
         (tool_schemas, module_desc)
     } else {

@@ -16,8 +16,8 @@ impl OutputStreamer for NullStreamer {
         Ok(())
     }
 
-    async fn handle_event(&mut self, event: StreamEvent) -> AppResult<()> {
-        log::debug!("{:#?}", event);
+    async fn handle_event(&mut self, _event: StreamEvent) -> AppResult<()> {
+        // log::debug!("{:#?}", event);
         Ok(())
     }
 }

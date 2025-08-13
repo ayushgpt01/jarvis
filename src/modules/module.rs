@@ -1,14 +1,14 @@
 use serde::{Deserialize, Serialize};
 
 /// Tool definition
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Tool {
     #[serde(rename = "type")]
     pub tool_type: String,
     pub function: ToolFunction,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ToolFunction {
     pub name: String,
     pub description: String,
@@ -34,14 +34,14 @@ pub struct ToolFunction {
 }
 
 /// Tool call response
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ToolCall {
     #[serde(rename = "type")]
     pub tool_type: String,
     pub function: ToolCallFunction,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ToolCallFunction {
     pub name: String,
     /// Name of the module. This is returned by LLM
@@ -70,6 +70,8 @@ pub trait Module: Send + Sync {
     fn name(&self) -> &'static str;
     /// Description is what user will see in the help of cli
     fn description(&self) -> &'static str;
+    /// Pre-generated prompt with rules specific to module
+    fn get_prompt(&self) -> &'static str;
     /// Run method is used to invoke the modules
     fn run(&self, func: &ToolCallFunction) -> ModuleResult<serde_json::Value>;
     /// Available tools in this module in the OpenAI format

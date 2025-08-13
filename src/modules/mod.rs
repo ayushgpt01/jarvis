@@ -1,8 +1,8 @@
-mod arithmetic;
+mod math;
 mod module;
 mod registry;
 
-pub use arithmetic::Arithmetic;
+pub use math::Math;
 pub use module::{
     Module, ModuleError, ModuleResult, Tool, ToolCall, ToolCallFunction, ToolFunction,
 };

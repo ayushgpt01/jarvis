@@ -1,6 +1,6 @@
 use super::{OutputStreamer, StreamEvent};
 use crate::AppResult;
-use log::{debug, error, info};
+// use log::{debug, error, info};
 use std::io::{self, Write};
 // use tokio::time::{Instant, Duration};
 
@@ -50,14 +50,14 @@ impl OutputStreamer for CliStreamer {
     }
 
     async fn handle_event(&mut self, event: StreamEvent) -> AppResult<()> {
-        debug!("{:?}", event);
+        // debug!("{:?}", event);
         match event {
             StreamEvent::Token(token) => {
                 if self.show_progress {
                     self.clear_line()?;
                 }
                 self.write(&token)?;
-                debug!("Streamed token: {}", token);
+                // debug!("Streamed token: {}", token);
             }
             StreamEvent::Progress(progress) => {
                 // if self.show_progress && self.last_progress_update.elapsed() >= Duration::from_millis(50)
@@ -77,14 +77,14 @@ impl OutputStreamer for CliStreamer {
                     self.clear_line()?;
                     self.write(&format!("\r💬 {}\n", status))?;
                 }
-                info!("Status: {}", status);
+                // info!("Status: {}", status);
             }
             StreamEvent::Error(error) => {
                 if self.show_progress {
                     self.clear_line()?;
                 }
                 self.write(&format!("\rError: {}\n", error))?;
-                error!("Stream error: {}", error);
+                // error!("Stream error: {}", error);
             }
             StreamEvent::Finished => {
                 if self.show_progress {
@@ -92,7 +92,7 @@ impl OutputStreamer for CliStreamer {
                 }
                 // Just ensure we're on a new line
                 self.flush()?;
-                info!("Streaming finished");
+                // info!("Streaming finished");
             }
         }
 

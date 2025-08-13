@@ -1,4 +1,4 @@
-use super::{Arithmetic, Module, Tool, ToolCallFunction};
+use super::{Math, Module, Tool, ToolCallFunction};
 use crate::{AppError, AppResult};
 use std::{collections::HashMap, fmt};
 
@@ -6,10 +6,11 @@ pub struct ModuleRegistry {
     modules: HashMap<String, Box<dyn Module + Send + Sync>>,
 }
 
+#[allow(dead_code)]
 impl ModuleRegistry {
     pub fn new() -> ModuleRegistry {
         let mut registry: HashMap<String, Box<dyn Module + Send + Sync>> = HashMap::new();
-        registry.insert(Arithmetic::name().to_string(), Box::new(Arithmetic::new()));
+        registry.insert(Math::name().to_string(), Box::new(Math::new()));
 
         ModuleRegistry { modules: registry }
     }
@@ -21,7 +22,10 @@ impl ModuleRegistry {
     }
 
     pub fn list_modules(&self) -> Vec<String> {
-        self.modules.keys().cloned().collect()
+        self.modules
+            .iter()
+            .map(|v| format!("{} : {}", v.1.name(), v.1.description()))
+            .collect()
     }
 
     pub fn all_tools(&self) -> Vec<Tool> {
@@ -41,15 +45,15 @@ impl ModuleRegistry {
         let modules: String = self
             .modules
             .iter()
-            .map(|v| format!("- {}: {}\n", v.1.name(), v.1.description()))
+            .map(|v| format!("{}\n", v.1.get_prompt()))
             .collect();
 
         modules
     }
 
-    // pub fn register_module(&mut self, name: String, module: Box<dyn Module>) {
-    //     self.modules.insert(name, module);
-    // }
+    pub fn register_module(&mut self, name: String, module: Box<dyn Module>) {
+        self.modules.insert(name, module);
+    }
 
     pub fn get_module(&self, name: &str) -> Option<&Box<dyn Module + Send + Sync>> {
         self.modules.get(name)

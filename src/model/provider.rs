@@ -11,15 +11,14 @@ pub trait ModelConfig: Send + Sync + Clone {
     #[allow(dead_code)]
     fn model_name(&self) -> &str;
 
-    #[allow(dead_code)]
     fn validate(&self) -> AppResult<()>;
 }
 
+#[allow(dead_code)]
 #[async_trait::async_trait]
 pub trait ModelProvider: Send + Sync {
     type Config: ModelConfig;
 
-    #[allow(dead_code)]
     async fn generate_streaming(
         &self,
         messages: &[Message],
@@ -27,7 +26,6 @@ pub trait ModelProvider: Send + Sync {
         streamer: &mut dyn OutputStreamer,
     ) -> AppResult<GenerateResult>;
 
-    #[allow(dead_code)]
     async fn generate(
         &self,
         messages: &[Message],
@@ -35,15 +33,12 @@ pub trait ModelProvider: Send + Sync {
         streamer: &mut dyn OutputStreamer,
     ) -> AppResult<GenerateResult>;
 
-    #[allow(dead_code)]
     fn provider_name(&self) -> &'static str;
 
-    #[allow(dead_code)]
     fn supports_streaming(&self) -> bool {
         true
     }
 
-    #[allow(dead_code)]
     fn supports_system_messages(&self) -> bool {
         true
     }
@@ -52,7 +47,6 @@ pub trait ModelProvider: Send + Sync {
         true
     }
 
-    #[allow(dead_code)]
     fn max_context_length(&self) -> Option<usize> {
         None
     }

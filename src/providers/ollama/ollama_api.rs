@@ -86,6 +86,7 @@ impl From<&Message> for OllamaMessage {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct OllamaCompletionChoice {
     #[serde(skip_deserializing)]
@@ -96,6 +97,7 @@ pub struct OllamaCompletionChoice {
     pub delta: Option<OllamaCompletionDelta>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct OllamaCompletionMessage {
     pub content: String,
@@ -103,13 +105,16 @@ pub struct OllamaCompletionMessage {
     pub tool_calls: Option<Vec<ToolCall>>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct OllamaCompletionDelta {
     pub content: Option<String>,
+    #[serde(skip_deserializing)]
     pub role: Option<String>,
     pub tool_calls: Option<Vec<ToolCall>>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct OllamaCompletionUsage {
     #[serde(skip_deserializing)]
@@ -120,6 +125,7 @@ pub struct OllamaCompletionUsage {
     pub total_tokens: i32,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct OllamaCompletionResponse {
     #[serde(skip_deserializing)]

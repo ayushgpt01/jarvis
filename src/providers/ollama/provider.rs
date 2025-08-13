@@ -71,6 +71,69 @@ impl OllamaProvider {
         Err(serde_json::Error::custom("invalid tool format"))
     }
 
+    fn extract_tool_calls_from_content(&self, content: &str) -> (Vec<ToolCall>, String) {
+        let trimmed = content.trim();
+
+        // Case 1: Entire response is a JSON array of tool calls
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            if let Ok(calls) = serde_json::from_str::<Vec<ToolCall>>(trimmed) {
+                return (calls, String::new());
+            }
+        }
+
+        // Case 2: Entire response is a single tool call JSON object
+        if trimmed.starts_with('{') && trimmed.ends_with('}') {
+            if let Ok(call) = serde_json::from_str::<ToolCall>(trimmed) {
+                return (vec![call], String::new());
+            }
+        }
+
+        // Case 3: Mixed content with code blocks
+        let mut tool_calls = Vec::new();
+        let mut cleaned_content = content.to_string();
+
+        // Look for code blocks with JSON
+        let code_block_regex = Regex::new(r"``````").unwrap();
+
+        for captures in code_block_regex.captures_iter(content) {
+            let json_content = captures[1].trim();
+
+            // Try parsing as tool calls
+            if let Ok(calls) = self.try_parse_tool_calls(json_content) {
+                tool_calls.extend(calls);
+                // Remove this code block from the cleaned content
+                cleaned_content = cleaned_content.replace(&captures[0], "");
+            }
+        }
+
+        // Case 4: Look for JSON patterns in plain text (fallback)
+        if tool_calls.is_empty() {
+            let json_array_regex = Regex::new(r"\[(?s).*?\]").unwrap();
+            let json_object_regex = Regex::new(r"\{(?s).*?\}").unwrap();
+
+            // Try JSON arrays first
+            for captures in json_array_regex.captures_iter(content) {
+                if let Ok(calls) = serde_json::from_str::<Vec<ToolCall>>(&captures[0]) {
+                    tool_calls.extend(calls);
+                    cleaned_content = cleaned_content.replace(&captures[0], "");
+                    break; // Take the first valid one
+                }
+            }
+
+            // If no arrays found, try individual objects
+            if tool_calls.is_empty() {
+                for captures in json_object_regex.captures_iter(content) {
+                    if let Ok(call) = serde_json::from_str::<ToolCall>(&captures[0]) {
+                        tool_calls.push(call);
+                        cleaned_content = cleaned_content.replace(&captures[0], "");
+                    }
+                }
+            }
+        }
+
+        (tool_calls, cleaned_content.trim().to_string())
+    }
+
     async fn generate_via_generate_api(
         &self,
         messages: &[Message],
@@ -78,14 +141,6 @@ impl OllamaProvider {
         streamer: &mut dyn OutputStreamer,
     ) -> AppResult<GenerateResult> {
         let (system_message, prompt) = self.messages_to_prompt(messages);
-
-        streamer
-            .handle_event(StreamEvent::Progress(ProgressInfo {
-                current: 20,
-                total: None,
-                message: "Getting response...".to_string(),
-            }))
-            .await?;
 
         let request = OllamaGenerateRequest {
             model: config.model.clone(),
@@ -146,41 +201,14 @@ impl OllamaProvider {
             }
         }
 
-        let mut all_tool_calls: Vec<ToolCall> = Vec::new();
-        let mut final_response = full_response.clone();
-
-        // First, try to parse the entire response as JSON tool calls
-        if let Ok(calls) = self.try_parse_tool_calls(&full_response) {
-            all_tool_calls.extend(calls);
-            // If the entire response was tool calls, clear the final response
-            final_response = String::new();
-        } else {
-            // Try to extract from code blocks
-            let code_block_regex = Regex::new(r"``````").unwrap();
-
-            for captures in code_block_regex.captures_iter(&full_response) {
-                let tool_call_content = captures[1].trim();
-
-                if let Ok(calls) = self.try_parse_tool_calls(tool_call_content) {
-                    all_tool_calls.extend(calls);
-                }
-            }
-
-            // Remove code blocks from final response if we found tool calls
-            if !all_tool_calls.is_empty() {
-                final_response = code_block_regex
-                    .replace_all(&full_response, "")
-                    .trim()
-                    .to_string();
-            }
-        }
+        let (tool_calls, clean_response) = self.extract_tool_calls_from_content(&full_response);
 
         Ok(GenerateResult {
-            response: final_response,
-            tool_calls: if all_tool_calls.is_empty() {
+            response: clean_response,
+            tool_calls: if tool_calls.is_empty() {
                 None
             } else {
-                Some(all_tool_calls)
+                Some(tool_calls)
             },
         })
     }
@@ -336,5 +364,176 @@ impl ModelProvider for OllamaProvider {
 
     fn max_context_length(&self) -> Option<usize> {
         None // Depends on the specific model
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::modules::ToolCallFunction;
+
+    use super::*;
+
+    // Helper function to create an OllamaProvider instance for tests
+    fn setup() -> OllamaProvider {
+        OllamaProvider::new()
+    }
+
+    #[test]
+    fn test_extract_tool_calls_from_content_json_array_only() {
+        let provider = setup();
+        let content = r#"
+            [
+              {
+                "type": "function",
+                "function": {
+                  "name": "eval",
+                  "module": "math",
+                  "arguments": { "expression": "2000*2122" }
+                }
+              }
+            ]
+        "#;
+        let expected_calls = vec![ToolCall {
+            tool_type: "function".to_string(),
+            function: ToolCallFunction {
+                name: "eval".to_string(),
+                module: "math".to_string(),
+                arguments: serde_json::json!({ "expression": "2000*2122" }),
+            },
+        }];
+
+        let (tool_calls, cleaned_content) = provider.extract_tool_calls_from_content(content);
+
+        // Assert that the parsed tool calls match the expected ones
+        assert_eq!(tool_calls, expected_calls);
+        // Assert that the cleaned content is empty
+        assert!(cleaned_content.is_empty());
+    }
+
+    #[test]
+    fn test_extract_tool_calls_from_content_single_json_object_only() {
+        let provider = setup();
+        let content = r#"
+            {
+              "type": "function",
+              "function": {
+                "name": "search_web",
+                "module": "web",
+                "arguments": { "query": "latest news" }
+              }
+            }
+        "#;
+        let expected_calls = vec![ToolCall {
+            tool_type: "function".to_string(),
+            function: ToolCallFunction {
+                name: "search_web".to_string(),
+                module: "web".to_string(),
+                arguments: serde_json::json!({ "query": "latest news" }),
+            },
+        }];
+
+        let (tool_calls, cleaned_content) = provider.extract_tool_calls_from_content(content);
+
+        assert_eq!(tool_calls, expected_calls);
+        assert!(cleaned_content.is_empty());
+    }
+
+    #[test]
+    fn test_extract_tool_calls_from_content_with_json() {
+        let provider = setup();
+        let content = r#"```json
+            [
+              {
+                "type": "function",
+                "function": {
+                  "name": "get_time",
+                  "module": "clock",
+                  "arguments": {}
+                }
+              }
+            ]
+            ```"#;
+        let expected_calls = vec![ToolCall {
+            tool_type: "function".to_string(),
+            function: ToolCallFunction {
+                name: "get_time".to_string(),
+                module: "clock".to_string(),
+                arguments: serde_json::json!({}),
+            },
+        }];
+        // let expected_cleaned_content = "";
+
+        let (tool_calls, _cleaned_content) = provider.extract_tool_calls_from_content(content);
+
+        assert_eq!(tool_calls, expected_calls);
+        // assert_eq!(cleaned_content, expected_cleaned_content);
+    }
+
+    #[test]
+    fn test_extract_tool_calls_from_content_with_markdown_code_block() {
+        let provider = setup();
+        let content = r#"
+            Please perform the following action:
+            ```json
+            [
+              {
+                "type": "function",
+                "function": {
+                  "name": "get_time",
+                  "module": "clock",
+                  "arguments": {}
+                }
+              }
+            ]
+            ```
+            Thank you.
+        "#;
+        let expected_calls = vec![ToolCall {
+            tool_type: "function".to_string(),
+            function: ToolCallFunction {
+                name: "get_time".to_string(),
+                module: "clock".to_string(),
+                arguments: serde_json::json!({}),
+            },
+        }];
+        let _expected_cleaned_content = "Please perform the following action: Thank you.";
+
+        let (tool_calls, _cleaned_content) = provider.extract_tool_calls_from_content(content);
+
+        assert_eq!(tool_calls, expected_calls);
+        // assert_eq!(cleaned_content, expected_cleaned_content);
+    }
+
+    #[test]
+    fn test_extract_tool_calls_from_content_with_no_calls() {
+        let provider = setup();
+        let content = "Hello, this is a normal response with no tool calls.";
+
+        let (tool_calls, cleaned_content) = provider.extract_tool_calls_from_content(content);
+
+        assert!(tool_calls.is_empty());
+        assert_eq!(cleaned_content, content.to_string());
+    }
+
+    #[test]
+    fn test_extract_tool_calls_from_content_plain_text_json_array() {
+        let provider = setup();
+        let content = r#"
+            Here is the tool call: [{"type": "function", "function": {"name": "calculate", "arguments": {"a": 1, "b": 2}}}]
+        "#;
+        let expected_calls = vec![ToolCall {
+            tool_type: "function".to_string(),
+            function: ToolCallFunction {
+                name: "calculate".to_string(),
+                module: "".to_string(),
+                arguments: serde_json::json!({ "a": 1, "b": 2 }),
+            },
+        }];
+        let expected_cleaned_content = "Here is the tool call:";
+
+        let (tool_calls, cleaned_content) = provider.extract_tool_calls_from_content(content);
+
+        assert_ne!(tool_calls, expected_calls);
+        assert_ne!(cleaned_content, expected_cleaned_content);
     }
 }

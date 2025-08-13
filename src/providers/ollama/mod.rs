@@ -7,7 +7,6 @@ use std::sync::Arc;
 use crate::{AppResult, modules::ModuleRegistry};
 
 pub use config::OllamaConfig;
-pub use ollama_api::OllamaModelOptions;
 pub use provider::OllamaProvider;
 
 pub type OllamaClient = crate::model::AIClient<provider::OllamaProvider>;
